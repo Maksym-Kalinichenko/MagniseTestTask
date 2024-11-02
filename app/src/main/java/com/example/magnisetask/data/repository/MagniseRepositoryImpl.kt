@@ -3,6 +3,8 @@ package com.example.magnisetask.data.repository
 import com.example.magnisetask.data.remote.MagniseApi
 import com.example.magnisetask.data.remote.MagniseApi.Companion.BASE_URL
 import com.example.magnisetask.data.remote.MagniseApi.Companion.TOKEN
+import com.example.magnisetask.data.remote.MagniseApi.Companion.WSS_URL
+import com.example.magnisetask.data.remote.SocketListener
 import com.example.magnisetask.domain.model.FinanceInfo
 import com.example.magnisetask.domain.model.FinanceInfoFull
 import com.example.magnisetask.domain.model.Instrument
@@ -10,11 +12,18 @@ import com.example.magnisetask.domain.model.InstrumentsResponse
 import com.example.magnisetask.domain.model.TokenResponse
 import com.example.magnisetask.domain.repository.MagniseRepository
 import com.example.magnisetask.util.Resource
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okio.ByteString
+import org.json.JSONArray
+import org.json.JSONObject
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -24,7 +33,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MagniseRepositoryImpl @Inject constructor() : MagniseRepository {
+class MagniseRepositoryImpl @Inject constructor() :
+    MagniseRepository {
+
+    private lateinit var webSocket: WebSocket
 
     private val retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
@@ -47,6 +59,7 @@ class MagniseRepositoryImpl @Inject constructor() : MagniseRepository {
         .build()
 
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun getTokenAsync(): TokenResponse? {
         return suspendCancellableCoroutine { continuation ->
             val tokenService = retrofit.create(MagniseApi::class.java).getToken()
@@ -69,6 +82,7 @@ class MagniseRepositoryImpl @Inject constructor() : MagniseRepository {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun getDataAsync(): InstrumentsResponse? {
         return suspendCancellableCoroutine { continuation ->
             val authService = retrofitAuth.create(MagniseApi::class.java).getInstruments()
@@ -124,6 +138,7 @@ class MagniseRepositoryImpl @Inject constructor() : MagniseRepository {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun getFinanceAsync(authService: Call<FinanceInfo>): FinanceInfo? {
         return suspendCancellableCoroutine { continuation ->
             authService.enqueue(object : Callback<FinanceInfo> {
@@ -159,4 +174,58 @@ class MagniseRepositoryImpl @Inject constructor() : MagniseRepository {
             Resource.Error("Failed to fetch historical prices")
         }
     }
+
+    override fun realTimeWebSocket(id: String, socketListener: SocketListener) {
+        val request = Request.Builder()
+            .url(WSS_URL)
+            .addHeader("Authorization", "Bearer $TOKEN")
+            .build()
+
+        webSocket = OkHttpClient().newWebSocket(request, object : WebSocketListener() {
+
+            override fun onOpen(webSocket: WebSocket, response: okhttp3.Response) {
+                sendEvent(id)
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                socketListener.onNewMessage(text)
+            }
+
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                closeWebSocket()
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+
+            }
+
+            override fun onFailure(
+                webSocket: WebSocket,
+                t: Throwable,
+                response: okhttp3.Response?
+            ) {
+                socketListener.onError(t.toString())
+            }
+        })
+    }
+
+    override fun closeWebSocket() {
+        webSocket.close(1000, null)
+    }
+
+    fun sendEvent(id: String) {
+        val event = JSONObject().apply {
+            put("type", "l1-subscription")
+            put("id", "1")
+            put("instrumentId", id)
+            put("provider", "oanda")
+            put("subscribe", true)
+            put("kinds", JSONArray(listOf("last")))
+        }
+        webSocket.send(event.toString())
+    }
 }
+

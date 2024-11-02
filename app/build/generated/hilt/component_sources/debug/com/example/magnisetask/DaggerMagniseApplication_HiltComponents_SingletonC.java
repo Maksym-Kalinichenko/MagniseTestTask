@@ -7,7 +7,9 @@ import androidx.fragment.app.Fragment;
 import androidx.hilt.work.HiltWrapper_WorkerFactoryModule;
 import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.ViewModel;
-import com.example.magnisetask.data.repository.MagniseRepositoryImpl;
+import com.example.magnisetask.data.di.RepositoryModule;
+import com.example.magnisetask.data.di.RepositoryModule_ProvideMagniseRepositoryFactory;
+import com.example.magnisetask.domain.repository.MagniseRepository;
 import com.example.magnisetask.presentation.finance_info.FinanceInfoViewModel;
 import com.example.magnisetask.presentation.finance_info.FinanceInfoViewModel_HiltModules_KeyModule_ProvideFactory;
 import com.example.magnisetask.presentation.finance_listings.FinanceListingsViewModel;
@@ -62,6 +64,8 @@ public final class DaggerMagniseApplication_HiltComponents_SingletonC {
   }
 
   public static final class Builder {
+    private RepositoryModule repositoryModule;
+
     private Builder() {
     }
 
@@ -94,8 +98,16 @@ public final class DaggerMagniseApplication_HiltComponents_SingletonC {
       return this;
     }
 
+    public Builder repositoryModule(RepositoryModule repositoryModule) {
+      this.repositoryModule = Preconditions.checkNotNull(repositoryModule);
+      return this;
+    }
+
     public MagniseApplication_HiltComponents.SingletonC build() {
-      return new SingletonCImpl();
+      if (repositoryModule == null) {
+        this.repositoryModule = new RepositoryModule();
+      }
+      return new SingletonCImpl(repositoryModule);
     }
   }
 
@@ -475,10 +487,10 @@ public final class DaggerMagniseApplication_HiltComponents_SingletonC {
       public T get() {
         switch (id) {
           case 0: // com.example.magnisetask.presentation.finance_info.FinanceInfoViewModel 
-          return (T) new FinanceInfoViewModel(viewModelCImpl.savedStateHandle, singletonCImpl.magniseRepositoryImplProvider.get());
+          return (T) new FinanceInfoViewModel(viewModelCImpl.savedStateHandle, singletonCImpl.provideMagniseRepositoryProvider.get());
 
           case 1: // com.example.magnisetask.presentation.finance_listings.FinanceListingsViewModel 
-          return (T) new FinanceListingsViewModel(singletonCImpl.magniseRepositoryImplProvider.get());
+          return (T) new FinanceListingsViewModel(singletonCImpl.provideMagniseRepositoryProvider.get());
 
           default: throw new AssertionError(id);
         }
@@ -556,23 +568,25 @@ public final class DaggerMagniseApplication_HiltComponents_SingletonC {
   }
 
   private static final class SingletonCImpl extends MagniseApplication_HiltComponents.SingletonC {
+    private final RepositoryModule repositoryModule;
+
     private final SingletonCImpl singletonCImpl = this;
 
-    private Provider<MagniseRepositoryImpl> magniseRepositoryImplProvider;
+    private Provider<MagniseRepository> provideMagniseRepositoryProvider;
 
-    private SingletonCImpl() {
-
-      initialize();
+    private SingletonCImpl(RepositoryModule repositoryModuleParam) {
+      this.repositoryModule = repositoryModuleParam;
+      initialize(repositoryModuleParam);
 
     }
 
     @SuppressWarnings("unchecked")
-    private void initialize() {
-      this.magniseRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<MagniseRepositoryImpl>(singletonCImpl, 0));
+    private void initialize(final RepositoryModule repositoryModuleParam) {
+      this.provideMagniseRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<MagniseRepository>(singletonCImpl, 0));
     }
 
     @Override
-    public void injectMagniseApplication(MagniseApplication arg0) {
+    public void injectMagniseApplication(MagniseApplication magniseApplication) {
     }
 
     @Override
@@ -604,8 +618,8 @@ public final class DaggerMagniseApplication_HiltComponents_SingletonC {
       @Override
       public T get() {
         switch (id) {
-          case 0: // com.example.magnisetask.data.repository.MagniseRepositoryImpl 
-          return (T) new MagniseRepositoryImpl();
+          case 0: // com.example.magnisetask.domain.repository.MagniseRepository 
+          return (T) RepositoryModule_ProvideMagniseRepositoryFactory.provideMagniseRepository(singletonCImpl.repositoryModule);
 
           default: throw new AssertionError(id);
         }

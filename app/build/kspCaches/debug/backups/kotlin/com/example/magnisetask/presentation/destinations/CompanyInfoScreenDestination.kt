@@ -11,6 +11,7 @@ import com.ramcosta.composedestinations.spec.Direction
 import androidx.compose.runtime.remember
 import androidx.lifecycle.SavedStateHandle
 import com.example.magnisetask.presentation.finance_info.CompanyInfoScreen
+import com.ramcosta.composedestinations.navigation.DestinationsNavController
 
 object CompanyInfoScreenDestination : TypedDestination<CompanyInfoScreenDestination.NavArgs> {
          
@@ -39,7 +40,8 @@ object CompanyInfoScreenDestination : TypedDestination<CompanyInfoScreenDestinat
     ) {
 		val (finance) = remember { argsFrom(navBackStackEntry) }
 		CompanyInfoScreen(
-			finance = finance
+			finance = finance, 
+			navigator = DestinationsNavController(navController, navBackStackEntry)
 		)
     }
                     

@@ -1,6 +1,7 @@
 package com.example.magnisetask.presentation.finance_info
 
 import android.annotation.SuppressLint
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,21 +37,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ramcosta.composedestinations.annotation.Destination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+
 
 @SuppressLint("NewApi")
 @Composable
 @Destination
 fun CompanyInfoScreen(
     finance: String,
+    navigator: DestinationsNavigator,
     viewModel: FinanceInfoViewModel = hiltViewModel()
 ) {
     val state = viewModel.state
     val date by viewModel.dateFlow.collectAsState()
+    val realtimePrice by viewModel.realtimeData.collectAsState()
     val calendarData = viewModel.calendarData.collectAsState()
     val minuteColor = remember { mutableStateOf(Color.Yellow) }
     val hourColor = remember { mutableStateOf(Color.White) }
     val symbol = remember(date) {
         derivedStateOf { state.finance.toString() }
+    }
+    BackHandler {
+        viewModel.closeWebSocket()
+        navigator.popBackStack()
     }
     Column(
         modifier = Modifier
@@ -94,7 +103,7 @@ fun CompanyInfoScreen(
             TextColumn("Symbol", symbol.value)
             TextColumn(
                 "Price",
-                if (state.financeInfos.isNotEmpty()) (state.financeInfos[state.financeInfos.size - 1].c).toString() else "0"
+                realtimePrice.toString()
             )
             TextColumn("Time", date)
         }

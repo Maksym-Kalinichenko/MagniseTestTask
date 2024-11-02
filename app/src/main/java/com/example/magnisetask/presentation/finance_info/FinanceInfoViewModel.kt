@@ -7,10 +7,14 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.magnisetask.data.remote.SocketListener
 import com.example.magnisetask.domain.model.FinanceInfoFull
+import com.example.magnisetask.domain.model.RealtimeDataSnapShot
+import com.example.magnisetask.domain.model.RealtimeDataUpdate
 import com.example.magnisetask.domain.repository.MagniseRepository
 import com.example.magnisetask.util.Resource
 import com.example.magnisetask.util.TimeFormat
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -29,8 +33,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class FinanceInfoViewModel @Inject constructor(
-    private val savedStateHandle: SavedStateHandle, private val repository: MagniseRepository
-) : ViewModel() {
+    private val savedStateHandle: SavedStateHandle,
+    private val repository: MagniseRepository
+) : ViewModel(), SocketListener {
 
     var state by mutableStateOf(FinanceInfoState())
 
@@ -40,13 +45,16 @@ class FinanceInfoViewModel @Inject constructor(
     private val _calendarData = MutableStateFlow(0L)
     val calendarData: StateFlow<Long> = _calendarData.asStateFlow()
 
+    private val _realtimeData = MutableStateFlow(0.0)
+    val realtimeData: StateFlow<Double> = _realtimeData.asStateFlow()
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val finance = savedStateHandle.get<String>("finance") ?: return@launch
             val data = finance.split(",").toTypedArray()
 
             updateData(data, repository.getFinanceInfo(data[4]), TimeFormat.MINUTE)
-
+            repository.realTimeWebSocket(data[4], this@FinanceInfoViewModel)
             while (true) {
                 if (calendarData.value != 0L) {
                     val startDate = dateFromLong(calendarData.value)
@@ -60,6 +68,7 @@ class FinanceInfoViewModel @Inject constructor(
                             repository.getOldData(data[4], startDate, endDate),
                             TimeFormat.HOUR
                         )
+                        _realtimeData.value = setNewPrice()
                     } else {
                         _calendarData.value = 0L
                     }
@@ -73,6 +82,27 @@ class FinanceInfoViewModel @Inject constructor(
             }
         }
     }
+
+    override fun onNewMessage(message: String) {
+        try {
+            _realtimeData.value = if (calendarData.value == 0L) {
+                if (message.contains("l1-update"))
+                    Gson().fromJson(message, RealtimeDataUpdate::class.java).last.price
+                else
+                    Gson().fromJson(message, RealtimeDataSnapShot::class.java).quote.last.price
+            } else setNewPrice()
+        } catch (_: Exception) {
+        }
+    }
+
+    override fun onError(error: String) {
+
+    }
+
+    private fun setNewPrice(): Double =
+        if (state.financeInfos.isNotEmpty())
+            (state.financeInfos[state.financeInfos.size - 1].c)
+        else 0.0
 
     private suspend fun updateData(
         data: Array<String>,
@@ -134,7 +164,13 @@ class FinanceInfoViewModel @Inject constructor(
         return localDate.format(formatter)
     }
 
+    fun closeWebSocket() {
+        repository.closeWebSocket()
+    }
+
     fun updateCalendarData(it: Long) {
         _calendarData.value = it
     }
+
+
 }

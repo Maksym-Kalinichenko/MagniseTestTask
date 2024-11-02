@@ -61,6 +61,7 @@ interface MagniseApi {
         const val PERIODICITY_H = "hour"
         const val INTERVAL = 1
         const val BARS_COUNT = 10
+        const val WSS_URL = "wss://platform.fintacharts.com/api/streaming/ws/v1/realtime"
         lateinit var TOKEN: String
     }
 

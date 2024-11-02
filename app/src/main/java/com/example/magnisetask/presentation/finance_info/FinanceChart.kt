@@ -1,5 +1,6 @@
 package com.example.magnisetask.presentation.finance_info
 
+import android.annotation.SuppressLint
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
@@ -19,10 +20,11 @@ import androidx.compose.ui.unit.sp
 import com.example.magnisetask.domain.model.FinanceInfoFull
 import com.example.magnisetask.ui.theme.LineColor
 
+@SuppressLint("DefaultLocale")
 @Composable
 fun FinanceChart(
-    infos: List<FinanceInfoFull> = emptyList(),
     modifier: Modifier = Modifier,
+    infos: List<FinanceInfoFull> = emptyList()
 ) {
     val spacing = 100f
     val transparentGraphColor = remember {
